@@ -1,0 +1,5 @@
+{
+  "name": "MajestIQ Recruit",
+  "description": "A modern Applicant Tracking System (ATS) integrated with Google Sheets and Gemini API for intelligent candidate analysis and management.",
+  "requestFramePermissions": []
+}
