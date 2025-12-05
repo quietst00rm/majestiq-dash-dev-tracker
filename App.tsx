@@ -41,7 +41,7 @@ import { StatusBadge } from './components/StatusBadge';
 
 // --- Components ---
 
-const Header = ({ darkMode, toggleDarkMode, isSyncing }: { darkMode: boolean, toggleDarkMode: () => void, isSyncing: boolean }) => (
+const Header = ({ darkMode, toggleDarkMode, isSyncing, analysisCount }: { darkMode: boolean, toggleDarkMode: () => void, isSyncing: boolean, analysisCount: number }) => (
   <header className="bg-white dark:bg-darkbg border-b border-gray-200 dark:border-white/10 sticky top-0 z-20 transition-colors duration-200">
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between h-20">
@@ -58,6 +58,12 @@ const Header = ({ darkMode, toggleDarkMode, isSyncing }: { darkMode: boolean, to
           </div>
         </div>
         <div className="flex items-center gap-4">
+           {analysisCount > 0 && (
+             <div className="hidden md:flex items-center text-xs font-bold px-3 py-1.5 rounded-full border transition-all duration-300 text-primary dark:text-primary bg-yellow-50 dark:bg-yellow-900/10 border-yellow-100 dark:border-yellow-900/30">
+               <Sparkles className="w-3.5 h-3.5 mr-2 animate-pulse" />
+               AI ANALYZING ({analysisCount})
+             </div>
+           )}
            <div className={`hidden md:flex items-center text-xs font-bold px-3 py-1.5 rounded-full border transition-all duration-300 ${isSyncing ? 'text-primary dark:text-primary bg-yellow-50 dark:bg-yellow-900/10 border-yellow-100 dark:border-yellow-900/30' : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30'}`}>
              <div className={`w-1.5 h-1.5 rounded-full mr-2 ${isSyncing ? 'bg-primary animate-spin' : 'bg-emerald-500 animate-pulse'}`}></div>
              {isSyncing ? 'SYNCING...' : 'LIVE SYNC ACTIVE'}
@@ -175,6 +181,10 @@ export default function App() {
   const [generatedEmail, setGeneratedEmail] = useState<string | null>(null);
   const [manualResumeText, setManualResumeText] = useState('');
 
+  // Auto-analysis tracking
+  const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
+  const [analysisQueue, setAnalysisQueue] = useState<string[]>([]);
+
   // New Note State
   const [newNote, setNewNote] = useState('');
 
@@ -188,7 +198,63 @@ export default function App() {
     const data = await fetchApplicants();
     setApplicants(data);
     setLoading(false);
+
+    // Queue candidates without AI analysis for auto-analysis
+    const needsAnalysis = data.filter(app => !app.aiAnalysis).map(app => app.id);
+    if (needsAnalysis.length > 0) {
+      setAnalysisQueue(needsAnalysis);
+    }
   };
+
+  // Process the analysis queue - analyze one candidate at a time
+  useEffect(() => {
+    if (analysisQueue.length === 0) return;
+
+    const processNext = async () => {
+      const nextId = analysisQueue[0];
+      const applicant = applicants.find(app => app.id === nextId);
+
+      if (!applicant || applicant.aiAnalysis) {
+        // Already analyzed or not found, skip to next
+        setAnalysisQueue(prev => prev.slice(1));
+        return;
+      }
+
+      // Mark as analyzing
+      setAnalyzingIds(prev => new Set(prev).add(nextId));
+
+      try {
+        const analysis = await analyzeCandidate(applicant);
+
+        if (analysis) {
+          const updated = { ...applicant, aiAnalysis: analysis };
+
+          // Update applicants state
+          setApplicants(prev => prev.map(a => a.id === nextId ? updated : a));
+
+          // Update selected applicant if it's the one being analyzed
+          setSelectedApplicant(prev => prev?.id === nextId ? updated : prev);
+
+          // Persist to localStorage
+          await updateApplicantData(updated);
+        }
+      } catch (error) {
+        console.error(`Error analyzing candidate ${applicant.fullName}:`, error);
+      } finally {
+        // Remove from analyzing set and queue
+        setAnalyzingIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(nextId);
+          return newSet;
+        });
+        setAnalysisQueue(prev => prev.slice(1));
+      }
+    };
+
+    // Small delay between analyses to avoid rate limiting
+    const timeoutId = setTimeout(processNext, 500);
+    return () => clearTimeout(timeoutId);
+  }, [analysisQueue, applicants]);
 
   const toggleDarkMode = () => setDarkMode(prev => !prev);
 
@@ -328,7 +394,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col font-sans text-gray-900 dark:text-gray-100 bg-[#f8fafc] dark:bg-darkbg transition-colors duration-200">
-      <Header darkMode={darkMode} toggleDarkMode={toggleDarkMode} isSyncing={syncing} />
+      <Header darkMode={darkMode} toggleDarkMode={toggleDarkMode} isSyncing={syncing} analysisCount={analysisQueue.length} />
 
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex gap-6 h-[calc(100vh-80px)] overflow-hidden">
         
@@ -587,6 +653,16 @@ export default function App() {
                                   <span className="text-xs text-gray-400 font-normal">/10</span>
                                 </span>
                               </div>
+                           ) : analyzingIds.has(app.id) ? (
+                             <div className="inline-flex flex-col items-center gap-1">
+                               <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                               <span className="text-[10px] text-primary font-bold">Analyzing</span>
+                             </div>
+                           ) : analysisQueue.includes(app.id) ? (
+                             <div className="inline-flex flex-col items-center gap-1">
+                               <Sparkles className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                               <span className="text-[10px] text-gray-400 font-medium">Queued</span>
+                             </div>
                            ) : (
                              <span className="inline-block w-8 h-1 rounded bg-gray-200 dark:bg-gray-700"></span>
                            )}
@@ -751,18 +827,18 @@ export default function App() {
                                 <Sparkles className="h-5 w-5 text-primary" />
                                 AI Candidate Assessment
                                 </h3>
-                                {!selectedApplicant.aiAnalysis && (
-                                <button 
+                                {selectedApplicant.aiAnalysis && (
+                                <button
                                     onClick={() => handleAnalyze(selectedApplicant)}
-                                    disabled={analyzing}
-                                    className="text-sm bg-primary text-black px-4 py-2 rounded-lg font-bold hover:bg-yellow-400 transition-all shadow-md disabled:opacity-50 flex items-center gap-2 active:scale-95"
+                                    disabled={analyzing || analyzingIds.has(selectedApplicant.id)}
+                                    className="text-xs bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-200 dark:hover:bg-white/10 transition-all disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    {analyzing ? <RefreshCw className="h-4 w-4 animate-spin"/> : <Sparkles className="h-4 w-4"/>}
-                                    {analyzing ? 'Analyzing...' : 'Generate Analysis'}
+                                    <RefreshCw className={`h-3 w-3 ${analyzing ? 'animate-spin' : ''}`}/>
+                                    Regenerate
                                 </button>
                                 )}
                             </div>
-                            
+
                             {selectedApplicant.aiAnalysis ? (
                             <div className="space-y-6">
                                 <div className="bg-yellow-50/50 dark:bg-yellow-900/10 p-5 rounded-xl border border-yellow-100 dark:border-yellow-800/30">
@@ -818,11 +894,39 @@ export default function App() {
                                     </ul>
                                 </div>
                             </div>
+                            ) : analyzingIds.has(selectedApplicant.id) ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-primary/30 dark:border-primary/20 rounded-xl bg-yellow-50/30 dark:bg-yellow-900/5">
+                                <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+                                <p className="text-primary dark:text-primary font-bold">Analyzing Candidate...</p>
+                                <p className="text-gray-400 dark:text-gray-500 text-sm max-w-sm mt-1">AI is evaluating their self-ratings against their technical scenario answers.</p>
+                            </div>
+                            ) : analysisQueue.includes(selectedApplicant.id) ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+                                  <Clock className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <p className="text-gray-500 dark:text-gray-400 font-bold">Queued for Analysis</p>
+                                <p className="text-gray-400 dark:text-gray-500 text-sm max-w-sm mt-1">This candidate is in the analysis queue and will be processed automatically.</p>
+                                <div className="mt-4 text-xs text-gray-400">
+                                  Position in queue: {analysisQueue.indexOf(selectedApplicant.id) + 1} of {analysisQueue.length}
+                                </div>
+                            </div>
                             ) : (
                             <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl">
                                 <Sparkles className="h-8 w-8 text-gray-300 dark:text-gray-600 mb-3" />
-                                <p className="text-gray-500 dark:text-gray-400 font-bold">AI Analysis Ready</p>
-                                <p className="text-gray-400 dark:text-gray-500 text-sm max-w-sm mt-1">Generate a deep-dive assessment comparing their self-ratings against their technical scenario answers.</p>
+                                <p className="text-gray-500 dark:text-gray-400 font-bold">Analysis Pending</p>
+                                <p className="text-gray-400 dark:text-gray-500 text-sm max-w-sm mt-1">AI analysis will be generated automatically. Refresh to trigger analysis.</p>
+                                <button
+                                    onClick={() => {
+                                      if (!analysisQueue.includes(selectedApplicant.id)) {
+                                        setAnalysisQueue(prev => [...prev, selectedApplicant.id]);
+                                      }
+                                    }}
+                                    className="mt-4 text-sm text-primary font-bold hover:underline flex items-center gap-1"
+                                >
+                                    <Sparkles className="h-3 w-3" /> Queue for Analysis
+                                </button>
                             </div>
                             )}
                         </div>
