@@ -56,9 +56,10 @@ export interface Applicant {
   sheetAiStrengths: string;
   sheetAiWeaknesses: string;
   sheetAiQuestions: string;
-  sheetComments: string; // "Sandeep Comments"
-  callDetails: string;   // "Call Details"
-  currentCtc: string;    // "Current CTC/Month"
+  sheetStatus: string;       // "Status" column in sheet
+  sheetComments: string;     // "Sandeep Comments"
+  callDetails: string;       // "Call Details"
+  currentCtc: string;        // "Current CTC/Month"
 
   // Augmented fields (local state or synced back to sheet columns)
   status: ApplicantStatus;
@@ -96,6 +97,7 @@ export const CSV_MAPPING: Record<string, keyof Applicant> = {
   'AI Strengths': 'sheetAiStrengths',
   'AI Weaknesses': 'sheetAiWeaknesses',
   'AI Questions': 'sheetAiQuestions',
+  'Status': 'sheetStatus',
   'Sandeep Comments': 'sheetComments',
   'Call Details': 'callDetails',
   'Current CTC/Month': 'currentCtc'
