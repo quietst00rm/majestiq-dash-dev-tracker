@@ -197,16 +197,15 @@ export const writeAIAnalysisToSheet = async (email: string, analysis: AIAnalysis
       questions: analysis.suggestedQuestions.join('; ')
     };
 
-    const response = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors', // Apps Script requires no-cors for anonymous access
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload)
+    // Use URL parameters for Apps Script (more reliable than POST body with CORS)
+    const params = new URLSearchParams();
+    params.append('data', JSON.stringify(payload));
+
+    const response = await fetch(`${APPS_SCRIPT_URL}?${params.toString()}`, {
+      method: 'GET',
+      mode: 'no-cors'
     });
 
-    // With no-cors, we can't read the response, but the request is sent
     console.log(`AI analysis for ${email} sent to Google Sheet`);
     return true;
   } catch (error) {
