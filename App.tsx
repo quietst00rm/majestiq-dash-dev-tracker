@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Settings, 
-  Search, 
-  Filter, 
-  RefreshCw, 
+import {
+  Users,
+  Settings,
+  Search,
+  Filter,
+  RefreshCw,
   ChevronRight,
   Star,
   Send,
@@ -20,20 +19,16 @@ import {
   Server,
   Github,
   Linkedin,
-  Calendar,
   DollarSign,
   Briefcase,
   Moon,
   Sun,
   Phone,
-  Edit3,
-  Save,
   MessageSquare,
   FileSearch,
   ExternalLink,
-  Maximize2
+  LayoutDashboard
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { fetchApplicants, updateApplicantData } from './services/sheetService';
 import { analyzeCandidate, generateEmail, generateResumeOverview } from './services/geminiService';
 import { Applicant, ApplicantStatus, Note } from './types';
@@ -148,8 +143,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
-  const [view, setView] = useState<'dashboard' | 'list'>('list');
-  const [detailTab, setDetailTab] = useState<'profile' | 'resume'>('profile'); // New state for tabs
+  const [detailTab, setDetailTab] = useState<'profile' | 'resume'>('profile');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ApplicantStatus | 'All'>('All');
   
@@ -374,126 +368,16 @@ export default function App() {
     });
   }, [applicants, searchTerm, statusFilter]);
 
-  const stats = useMemo(() => {
-    const total = applicants.length;
-    const byStatus = applicants.reduce((acc, curr) => {
-      acc[curr.status] = (acc[curr.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    // Chart Data
-    const statusData = Object.keys(ApplicantStatus).map(key => {
-        const status = ApplicantStatus[key as keyof typeof ApplicantStatus];
-        return { name: status, value: byStatus[status] || 0 };
-    });
-
-    return { total, byStatus, statusData };
-  }, [applicants]);
-
-  const COLORS = ['#94a3b8', '#fbbf24', '#a855f7', '#ec4899', '#10b981', '#ef4444'];
-
   return (
     <div className="min-h-screen flex flex-col font-sans text-gray-900 dark:text-gray-100 bg-[#f8fafc] dark:bg-darkbg transition-colors duration-200">
       <Header darkMode={darkMode} toggleDarkMode={toggleDarkMode} isSyncing={syncing} analysisCount={analysisQueue.length} />
 
-      <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex gap-6 h-[calc(100vh-80px)] overflow-hidden">
-        
-        {/* --- Sidebar / Navigation --- */}
-        <nav className="w-16 md:w-64 flex-shrink-0 flex flex-col gap-2">
-          <button 
-            onClick={() => { setView('dashboard'); setSelectedApplicant(null); }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${view === 'dashboard' ? 'bg-white dark:bg-white/10 text-primary dark:text-primary shadow-sm border border-gray-100 dark:border-white/5' : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-white/5 hover:shadow-sm'}`}
-          >
-            <LayoutDashboard className="h-5 w-5" />
-            <span className="hidden md:inline">Dashboard</span>
-          </button>
-          <button 
-             onClick={() => { setView('list'); }}
-             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${view === 'list' ? 'bg-white dark:bg-white/10 text-primary dark:text-primary shadow-sm border border-gray-100 dark:border-white/5' : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-white/5 hover:shadow-sm'}`}
-          >
-            <Users className="h-5 w-5" />
-            <span className="hidden md:inline">Candidates</span>
-            <span className="hidden md:inline ml-auto bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-gray-300 py-0.5 px-2 rounded-full text-xs font-semibold">
-              {applicants.length}
-            </span>
-          </button>
-        </nav>
-
+      <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 h-[calc(100vh-80px)] overflow-hidden">
         {/* --- Main Content Area --- */}
-        <div className="flex-1 flex flex-col bg-white dark:bg-darksurface rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 overflow-hidden relative transition-colors duration-200">
-          
-          {/* View: Dashboard */}
-          {view === 'dashboard' && (
-            <div className="flex-1 overflow-y-auto p-8 scrollbar-hide">
-              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Recruitment Overview</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-gradient-to-br from-indigo-50 to-white dark:from-white/5 dark:to-white/5 p-6 rounded-2xl border border-indigo-100 dark:border-white/10 shadow-sm">
-                  <div className="flex items-center gap-3">
-                     <div className="p-2 bg-indigo-100 dark:bg-white/10 rounded-lg text-indigo-600 dark:text-primary"><Users className="h-5 w-5"/></div>
-                     <div className="text-sm font-bold text-gray-600 dark:text-gray-400">Total Applications</div>
-                  </div>
-                  <div className="mt-4 text-4xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-                </div>
-                <div className="bg-gradient-to-br from-emerald-50 to-white dark:from-white/5 dark:to-white/5 p-6 rounded-2xl border border-emerald-100 dark:border-white/10 shadow-sm">
-                  <div className="flex items-center gap-3">
-                     <div className="p-2 bg-emerald-100 dark:bg-white/10 rounded-lg text-emerald-600 dark:text-emerald-400"><CheckCircle className="h-5 w-5"/></div>
-                     <div className="text-sm font-bold text-gray-600 dark:text-gray-400">Hired Candidates</div>
-                  </div>
-                  <div className="mt-4 text-4xl font-bold text-gray-900 dark:text-white">{stats.byStatus[ApplicantStatus.HIRED] || 0}</div>
-                </div>
-                <div className="bg-gradient-to-br from-amber-50 to-white dark:from-white/5 dark:to-white/5 p-6 rounded-2xl border border-amber-100 dark:border-white/10 shadow-sm">
-                   <div className="flex items-center gap-3">
-                     <div className="p-2 bg-amber-100 dark:bg-white/10 rounded-lg text-amber-600 dark:text-primary"><Clock className="h-5 w-5"/></div>
-                     <div className="text-sm font-bold text-gray-600 dark:text-gray-400">Active Pipeline</div>
-                  </div>
-                   <div className="mt-4 text-4xl font-bold text-gray-900 dark:text-white">
-                     {(stats.byStatus[ApplicantStatus.REVIEWING] || 0) + (stats.byStatus[ApplicantStatus.INTERVIEW] || 0)}
-                   </div>
-                </div>
-              </div>
+        <div className="flex flex-col bg-white dark:bg-darksurface rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 overflow-hidden relative transition-colors duration-200 h-full">
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-96">
-                <div className="p-6 border border-gray-100 dark:border-white/10 rounded-2xl bg-white dark:bg-darksurface shadow-sm">
-                  <h3 className="font-bold mb-6 text-gray-900 dark:text-white">Pipeline Distribution</h3>
-                  <ResponsiveContainer width="100%" height="85%">
-                    <BarChart data={stats.statusData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "#333" : "#f1f5f9"} />
-                      <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} tick={{fill: darkMode ? '#94a3b8' : '#64748b'}} dy={10} />
-                      <YAxis fontSize={12} tickLine={false} axisLine={false} tick={{fill: darkMode ? '#94a3b8' : '#64748b'}} />
-                      <RechartsTooltip cursor={{fill: darkMode ? '#333' : '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', backgroundColor: darkMode ? '#111' : '#fff', color: darkMode ? '#fff' : '#000', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                      <Bar dataKey="value" fill="#FFD700" radius={[6, 6, 0, 0]} barSize={40} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="p-6 border border-gray-100 dark:border-white/10 rounded-2xl bg-white dark:bg-darksurface shadow-sm flex flex-col items-center">
-                   <h3 className="font-bold mb-6 text-gray-900 dark:text-white self-start">Status Breakdown</h3>
-                   <ResponsiveContainer width="100%" height="85%">
-                    <PieChart>
-                      <Pie
-                        data={stats.statusData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={80}
-                        outerRadius={110}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {stats.statusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', backgroundColor: darkMode ? '#111' : '#fff', color: darkMode ? '#fff' : '#000', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                      <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* View: List */}
-          {view === 'list' && !selectedApplicant && (
+          {/* Candidates List */}
+          {!selectedApplicant && (
             <div className="flex flex-col h-full">
               {/* Toolbar */}
               <div className="p-5 border-b border-gray-200 dark:border-white/10 flex flex-col md:flex-row gap-4 items-center justify-between bg-white dark:bg-darksurface z-10 transition-colors">
