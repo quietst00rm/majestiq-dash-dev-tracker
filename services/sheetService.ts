@@ -1,8 +1,11 @@
-import { Applicant, ApplicantStatus, CSV_MAPPING } from "../types";
+import { Applicant, ApplicantStatus, CSV_MAPPING, AIAnalysis } from "../types";
 
 // The provided public Google Sheet URL
 const SHEET_ID = '1KLNx6IsNcDF9ven4DYL5oOzsnuT3-p3fXWEKGGv0bJc';
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+
+// Google Apps Script endpoint for writing to Sheet
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyQwIfa-QUGQZkVmAJOYUcukwTmfZILVDkfe5Wnyixq55abZaslRpby6FBREh7YKbwa/exec';
 
 // Robust CSV Parser that handles multiline values and quotes
 const parseCSV = (text: string): string[][] => {
@@ -100,6 +103,17 @@ export const fetchApplicants = async (): Promise<Applicant[]> => {
       if (!app.fullName) app.fullName = "Unknown Candidate";
       if (!app.email) app.email = "no-email@provided.com";
 
+      // Reconstruct aiAnalysis from sheet columns if they exist
+      if (app.sheetAiRating && app.sheetAiSummary) {
+        app.aiAnalysis = {
+          rating: parseFloat(app.sheetAiRating) || 0,
+          summary: app.sheetAiSummary || '',
+          strengths: app.sheetAiStrengths ? app.sheetAiStrengths.split(';').map((s: string) => s.trim()).filter(Boolean) : [],
+          weaknesses: app.sheetAiWeaknesses ? app.sheetAiWeaknesses.split(';').map((s: string) => s.trim()).filter(Boolean) : [],
+          suggestedQuestions: app.sheetAiQuestions ? app.sheetAiQuestions.split(';').map((s: string) => s.trim()).filter(Boolean) : []
+        };
+      }
+
       return app as Applicant;
     });
 
@@ -158,12 +172,45 @@ export const updateApplicantData = async (applicant: Applicant): Promise<boolean
     };
 
     localStorage.setItem('gemini_recruit_data_v2', JSON.stringify(parsedStore));
-    
-    // Simulate network delay for "Syncing" effect
-    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // If there's AI analysis, also write to Google Sheet
+    if (applicant.aiAnalysis) {
+      await writeAIAnalysisToSheet(applicant.email, applicant.aiAnalysis);
+    }
+
     return true;
   } catch (e) {
     console.error(e);
+    return false;
+  }
+};
+
+// Write AI analysis to Google Sheet via Apps Script
+export const writeAIAnalysisToSheet = async (email: string, analysis: AIAnalysis): Promise<boolean> => {
+  try {
+    const payload = {
+      email,
+      rating: analysis.rating,
+      summary: analysis.summary,
+      strengths: analysis.strengths.join('; '),
+      weaknesses: analysis.weaknesses.join('; '),
+      questions: analysis.suggestedQuestions.join('; ')
+    };
+
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors', // Apps Script requires no-cors for anonymous access
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    });
+
+    // With no-cors, we can't read the response, but the request is sent
+    console.log(`AI analysis for ${email} sent to Google Sheet`);
+    return true;
+  } catch (error) {
+    console.error('Error writing to Google Sheet:', error);
     return false;
   }
 };

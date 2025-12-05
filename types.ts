@@ -52,6 +52,10 @@ export interface Applicant {
 
   // Sheet specific / Editable Recruiter Data
   sheetAiRating: string;
+  sheetAiSummary: string;
+  sheetAiStrengths: string;
+  sheetAiWeaknesses: string;
+  sheetAiQuestions: string;
   sheetComments: string; // "Sandeep Comments"
   callDetails: string;   // "Call Details"
   currentCtc: string;    // "Current CTC/Month"
@@ -87,6 +91,11 @@ export const CSV_MAPPING: Record<string, keyof Applicant> = {
   'Availability': 'availability',
   'Upload Resume/CV': 'resumeUrl',
   'AI Rating ': 'sheetAiRating',
+  'AI Rating': 'sheetAiRating',
+  'AI Summary': 'sheetAiSummary',
+  'AI Strengths': 'sheetAiStrengths',
+  'AI Weaknesses': 'sheetAiWeaknesses',
+  'AI Questions': 'sheetAiQuestions',
   'Sandeep Comments': 'sheetComments',
   'Call Details': 'callDetails',
   'Current CTC/Month': 'currentCtc'
