@@ -360,13 +360,22 @@ export default function App() {
   // --- Derived State ---
   const filteredApplicants = useMemo(() => {
     return applicants.filter(app => {
-      const matchesSearch = 
+      const matchesSearch =
         app.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         app.email.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'All' || app.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      // Hide rejected candidates unless specifically filtering for them
+      const notRejected = statusFilter === 'Rejected' || statusFilter === 'All' ? true : app.status !== ApplicantStatus.REJECTED;
+      // When filter is 'All', still hide rejected by default
+      const hideRejectedInAll = statusFilter === 'All' ? app.status !== ApplicantStatus.REJECTED : true;
+      return matchesSearch && matchesStatus && hideRejectedInAll;
     });
   }, [applicants, searchTerm, statusFilter]);
+
+  // Count of rejected candidates (for showing in filter)
+  const rejectedCount = useMemo(() => {
+    return applicants.filter(app => app.status === ApplicantStatus.REJECTED).length;
+  }, [applicants]);
 
   return (
     <div className="min-h-screen flex flex-col font-sans text-gray-900 dark:text-gray-100 bg-[#f8fafc] dark:bg-darkbg transition-colors duration-200">

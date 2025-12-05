@@ -114,6 +114,11 @@ export const fetchApplicants = async (): Promise<Applicant[]> => {
         };
       }
 
+      // Use status from sheet if available
+      if (app.sheetStatus && Object.values(ApplicantStatus).includes(app.sheetStatus as ApplicantStatus)) {
+        app.status = app.sheetStatus as ApplicantStatus;
+      }
+
       return app as Applicant;
     });
 
@@ -173,6 +178,9 @@ export const updateApplicantData = async (applicant: Applicant): Promise<boolean
 
     localStorage.setItem('gemini_recruit_data_v2', JSON.stringify(parsedStore));
 
+    // Write status to Google Sheet
+    await writeStatusToSheet(applicant.email, applicant.status);
+
     // If there's AI analysis, also write to Google Sheet
     if (applicant.aiAnalysis) {
       await writeAIAnalysisToSheet(applicant.email, applicant.aiAnalysis);
@@ -185,10 +193,36 @@ export const updateApplicantData = async (applicant: Applicant): Promise<boolean
   }
 };
 
+// Write status to Google Sheet via Apps Script
+export const writeStatusToSheet = async (email: string, status: ApplicantStatus): Promise<boolean> => {
+  try {
+    const payload = {
+      action: 'updateStatus',
+      email,
+      status
+    };
+
+    const params = new URLSearchParams();
+    params.append('data', JSON.stringify(payload));
+
+    await fetch(`${APPS_SCRIPT_URL}?${params.toString()}`, {
+      method: 'GET',
+      mode: 'no-cors'
+    });
+
+    console.log(`Status for ${email} updated to ${status}`);
+    return true;
+  } catch (error) {
+    console.error('Error writing status to Google Sheet:', error);
+    return false;
+  }
+};
+
 // Write AI analysis to Google Sheet via Apps Script
 export const writeAIAnalysisToSheet = async (email: string, analysis: AIAnalysis): Promise<boolean> => {
   try {
     const payload = {
+      action: 'updateAIAnalysis',
       email,
       rating: analysis.rating,
       summary: analysis.summary,
